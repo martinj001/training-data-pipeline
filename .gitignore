@@ -1,8 +1,9 @@
 # Personal health data - never commit
 data/
 
-# Environment variables - never commit
+# Environment variables and tokens - never commit
 .env
+.tokens
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
