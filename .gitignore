@@ -1,3 +1,9 @@
+# Personal health data - never commit
+data/
+
+# Environment variables - never commit
+.env
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
