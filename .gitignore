@@ -3,6 +3,9 @@ data/*
 !data/manual/
 data/manual/*
 !data/manual/*.example.xlsx
+!data/manual/strength/
+data/manual/strength/*
+!data/manual/strength/*.example.xlsx
 
 # Environment variables and tokens - never commit
 .env

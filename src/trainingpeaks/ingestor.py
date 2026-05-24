@@ -166,7 +166,10 @@ def ingest_all():
     print(f"Found {len(zip_files)} zip file(s) to process.")
     total = 0
     for zf in zip_files:
-        total += ingest_zip(os.path.join(DATA_DIR, zf))
+        try:
+            total += ingest_zip(os.path.join(DATA_DIR, zf))
+        except Exception as e:
+            print(f"  SKIPPING {zf} — {e}")
 
     print(f"\nAll done! {total} total new workouts ingested.")
 

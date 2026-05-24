@@ -11,8 +11,8 @@ Root-level `sync.py` that accepts a source name as an argument (e.g. `python syn
 ### TrainingPeaks — FIT file ingestor
 Parse bulk-exported FIT files (zipped, 1 year per zip) from TrainingPeaks into SQLite. Pipeline should handle zips directly, extract second-by-second streams (power, HR, cadence, altitude, etc.), and store in a `trainingpeaks` table alongside Whoop data. Drop files into `data/trainingpeaks/`. ~15 years of history to ingest.
 
-### TrainingPeaks — Intervals.icu API for ongoing sync
-Once historical data is loaded, use Intervals.icu API (API key auth, no approval needed) for ongoing sync of new workouts. User plans to cancel TrainingPeaks subscription after data is safely extracted and verified.
+### Ongoing sync — Intervals.icu API (parked)
+Once TrainingPeaks historical export is complete and verified, set up Intervals.icu as the ongoing sync target. Plan: sync Garmin only (simpler than dual Garmin+Wahoo), Garmin auto-syncs to Intervals.icu, we hit the Intervals.icu API (API key, no approval). Cancel TrainingPeaks after data verified. Decision: Garmin-only device going forward if possible.
 
 ### Excel ingestor — strength & body metrics
 Parse `data/manual/strength_log.xlsx` and `data/manual/body_metrics.xlsx` into SQLite tables (`strength_sessions`, `body_metrics`). Safe to re-run — duplicate rows skipped. Add openpyxl to requirements.
