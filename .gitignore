@@ -1,5 +1,8 @@
 # Personal health data - never commit
-data/
+data/*
+!data/manual/
+data/manual/*
+!data/manual/*.example.xlsx
 
 # Environment variables and tokens - never commit
 .env
