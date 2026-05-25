@@ -6,6 +6,24 @@ guidance rather than generic advice.
 
 ---
 
+## Before you start — sync your data
+
+Run these two commands from the `training-data-pipeline` folder to make sure Claude has
+the latest data from all sources:
+
+```bash
+python src/whoop/sync.py
+python src/intervals/sync.py
+```
+
+- **Whoop sync** — pulls latest recovery scores, HRV, sleep, and gym sessions
+- **Intervals sync** — pulls latest Zwift rides and Garmin activities
+
+Two commands, fully up to date. Do this before any planning session or if you haven't
+synced in a few days. (Eventually this will run on a schedule automatically.)
+
+---
+
 ## How to start a conversation
 
 Open Claude (desktop app or claude.ai) and just talk naturally. You don't need any special commands.
