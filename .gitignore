@@ -6,6 +6,10 @@ data/manual/*
 !data/manual/strength/
 data/manual/strength/*
 !data/manual/strength/*.example.xlsx
+!data/plans/
+
+# Claude Code local settings - machine specific
+.claude/
 
 # Environment variables and tokens - never commit
 .env
