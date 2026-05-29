@@ -1,0 +1,28 @@
+name: Daily Training Email
+
+on:
+  schedule:
+    # 6:30 AM MDT (UTC-6) = 12:30 UTC  — shifts to 5:30 AM in winter (MST = UTC-7)
+    - cron: '30 12 * * *'
+  workflow_dispatch:  # allows manual trigger from GitHub UI
+
+jobs:
+  send-email:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install python-dotenv
+
+      - name: Send daily training email
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+        run: python src/notifications/daily_email.py
