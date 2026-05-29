@@ -392,7 +392,76 @@ def get_training_load_trend(weeks: int = 6) -> str:
     return "\n".join(lines)
 
 
+BODY_METRICS_FILE = PROJECT_ROOT / "data" / "manual" / "body_metrics.xlsx"
 PLANS_DIR = PROJECT_ROOT / "data" / "plans"
+
+
+@mcp.tool()
+def get_body_metrics(days: int = 14) -> str:
+    """
+    Read body metrics from the rolling daily log (data/manual/body_metrics.xlsx).
+    Shows bodyweight, calories, protein, and sleep for the last N days.
+    Fill in the spreadsheet after each day and this tool will reflect it immediately.
+    """
+    if not BODY_METRICS_FILE.exists():
+        return "No body metrics log found. Start logging at data/manual/body_metrics.xlsx."
+
+    try:
+        import openpyxl
+    except ImportError:
+        return "openpyxl not installed."
+
+    from datetime import date as date_cls
+
+    cutoff = (datetime.now() - timedelta(days=days)).date()
+
+    def parse_date(val):
+        if val is None:
+            return None
+        if isinstance(val, datetime):
+            return val.date()
+        if isinstance(val, date_cls):
+            return val
+        try:
+            return datetime.strptime(str(val)[:10], "%Y-%m-%d").date()
+        except ValueError:
+            return None
+
+    try:
+        wb = openpyxl.load_workbook(str(BODY_METRICS_FILE), data_only=True)
+        ws = wb.active
+    except Exception as e:
+        return f"Could not read body_metrics.xlsx: {e}"
+
+    rows = []
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        cols = (list(row) + [None] * 6)[:6]
+        date_val, weight, calories, protein, sleep, notes = cols
+        row_date = parse_date(date_val)
+        if row_date is None or row_date < cutoff:
+            continue
+        rows.append((row_date, weight, calories, protein, sleep, notes))
+
+    if not rows:
+        return f"No body metrics logged in the last {days} days."
+
+    rows.sort(key=lambda r: r[0], reverse=True)
+    lines = [f"Body metrics — last {days} days ({len(rows)} day(s)):\n"]
+    for row_date, weight, calories, protein, sleep, notes in rows:
+        parts = [f"  {row_date}"]
+        if weight is not None:
+            parts.append(f"weight {weight}kg")
+        if calories is not None:
+            parts.append(f"calories {int(calories)}kcal")
+        if protein is not None:
+            parts.append(f"protein {int(protein)}g")
+        if sleep is not None:
+            parts.append(f"sleep {sleep}h")
+        if notes:
+            parts.append(f"({notes})")
+        lines.append(" | ".join(parts))
+
+    return "\n".join(lines)
 
 
 @mcp.tool()

@@ -20,7 +20,7 @@ python src/intervals/sync.py
 - **Intervals sync** — pulls latest Zwift rides and Garmin activities
 
 Two commands, fully up to date. Do this before any planning session or if you haven't
-synced in a few days. (Eventually this will run on a schedule automatically.)
+synced in a few days.
 
 ---
 
@@ -138,5 +138,6 @@ python src/whoop/sync.py
 python src/intervals/sync.py
 ```
 
-Eventually these will run automatically on a schedule — for now, run them manually if you want
-the most up-to-date picture before a planning session.
+Run these manually before a planning session if you want the most up-to-date picture.
+
+> **Daily email:** Your workout for the day is automatically emailed to you at 6:30 AM every morning — no need to open VS Code. See `docs/setup-daily-email.md` for details.

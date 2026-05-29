@@ -1,6 +1,27 @@
+import sys
+import argparse
 import sqlite3
+from datetime import datetime, timedelta
 from database import initialize_db, get_connection
 from client import whoop_get
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--days", type=int, default=None)
+    args, _ = parser.parse_known_args()
+    return args.days
+
+
+def get_sync_start(days=None):
+    """Return ISO start timestamp, or None for full history.
+
+    --days N: sync last N days.
+    No flag: full history (no start filter).
+    """
+    if days is not None:
+        return (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    return None
 
 
 def fetch_all_pages(endpoint, params=None):
@@ -26,9 +47,12 @@ def fetch_all_pages(endpoint, params=None):
     return records
 
 
-def sync_recovery():
+def sync_recovery(days=None):
     print("Syncing recovery data...")
-    records = fetch_all_pages("/recovery")
+    start = get_sync_start(days)
+    print(f"  From {start[:10]}" if start else "  Full history")
+    params = {"start": start} if start else {}
+    records = fetch_all_pages("/recovery", params)
     conn = get_connection()
     cursor = conn.cursor()
     inserted = 0
@@ -55,9 +79,12 @@ def sync_recovery():
     print(f"Recovery sync complete: {inserted} new records saved.\n")
 
 
-def sync_sleep():
+def sync_sleep(days=None):
     print("Syncing sleep data...")
-    records = fetch_all_pages("/activity/sleep")
+    start = get_sync_start(days)
+    print(f"  From {start[:10]}" if start else "  Full history")
+    params = {"start": start} if start else {}
+    records = fetch_all_pages("/activity/sleep", params)
     conn = get_connection()
     cursor = conn.cursor()
     inserted = 0
@@ -88,9 +115,12 @@ def sync_sleep():
     print(f"Sleep sync complete: {inserted} new records saved.\n")
 
 
-def sync_workouts():
+def sync_workouts(days=None):
     print("Syncing workout data...")
-    records = fetch_all_pages("/activity/workout")
+    start = get_sync_start(days)
+    print(f"  From {start[:10]}" if start else "  Full history")
+    params = {"start": start} if start else {}
+    records = fetch_all_pages("/activity/workout", params)
     conn = get_connection()
     cursor = conn.cursor()
     inserted = 0
@@ -122,9 +152,12 @@ def sync_workouts():
     print(f"Workout sync complete: {inserted} new records saved.\n")
 
 
-def sync_cycles():
+def sync_cycles(days=None):
     print("Syncing cycle data...")
-    records = fetch_all_pages("/cycle")
+    start = get_sync_start(days)
+    print(f"  From {start[:10]}" if start else "  Full history")
+    params = {"start": start} if start else {}
+    records = fetch_all_pages("/cycle", params)
     conn = get_connection()
     cursor = conn.cursor()
     inserted = 0
@@ -150,9 +183,10 @@ def sync_cycles():
 
 
 if __name__ == "__main__":
+    days = parse_args()
     initialize_db()
-    sync_recovery()
-    sync_sleep()
-    sync_workouts()
-    sync_cycles()
+    sync_recovery(days)
+    sync_sleep(days)
+    sync_workouts(days)
+    sync_cycles(days)
     print("Full sync complete!")
