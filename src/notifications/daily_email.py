@@ -55,10 +55,10 @@ def extract_today_section(plan_text: str) -> str | None:
          | May 27 | Wed | Cardio | Zwift — zone 2 aerobic ride | 45–60 min |
        For strength days it also fetches the full session detail section.
     """
-    result = _extract_by_heading(plan_text)
+    result = _extract_from_table(plan_text)
     if result:
         return result
-    return _extract_from_table(plan_text)
+    return _extract_by_heading(plan_text)
 
 
 def _extract_by_heading(plan_text: str) -> str | None:
