@@ -8,19 +8,48 @@ guidance rather than generic advice.
 
 ## Before you start — sync your data
 
-Run these two commands from the `training-data-pipeline` folder to make sure Claude has
-the latest data from all sources:
+Make sure Claude has the latest data from all sources before a planning session.
+You have two ways to do this:
 
-```bash
-python src/whoop/sync.py
-python src/intervals/sync.py
+**Option A — Terminal**
+
+Activate the project venv first, then run:
+
+```bat
+cd C:\Users\marti\dev\training-data-pipeline
+.venv\Scripts\activate.bat
+python sync.py all
 ```
 
-- **Whoop sync** — pulls latest recovery scores, HRV, sleep, and gym sessions
-- **Intervals sync** — pulls latest Zwift rides and Garmin activities
+Your prompt will show `(.venv)` confirming the right Python is active.
 
-Two commands, fully up to date. Do this before any planning session or if you haven't
-synced in a few days.
+**Option B — Ask Claude directly**
+
+Just say it in the conversation:
+
+> "Sync my data before we start."
+
+Claude will call `sync_data()` behind the scenes and show you the output inline.
+No terminal needed.
+
+---
+
+Either way, what gets synced:
+
+- **Whoop** — pulls latest recovery scores, HRV, sleep, and gym sessions
+- **Intervals** — pulls latest Zwift rides and Garmin activities
+- **Manual** — ingests strength logs and body metrics Excel files into the database
+
+**Adjusting the sync window** — by default, sync picks up from where it left off. Use `--days` to go back further:
+
+```bash
+python sync.py all --days 14     # re-sync last 14 days
+python sync.py whoop --days 30   # re-sync Whoop only, last 30 days
+python sync.py manual --days 0   # re-ingest all manual logs ever
+```
+
+In a conversation you can also say:
+> "Re-sync the last 14 days" and Claude will pass `--days 14` through automatically.
 
 ---
 
@@ -39,7 +68,7 @@ Claude will pull your data automatically in the background before answering.
 
 ---
 
-## The 5 tools (what Claude sees)
+## The tools (what Claude sees)
 
 You never call these directly — Claude uses them behind the scenes.
 
@@ -49,7 +78,8 @@ You never call these directly — Claude uses them behind the scenes.
 | `get_recent_workouts` | Last N days of activity: Zwift rides, Garmin outdoor cardio, Whoop gym sessions |
 | `get_weekly_pillar_summary` | This week's strength / cardio / mobility balance at a glance |
 | `get_current_plan` | Reads your active bi-weekly training plan |
-| `get_strength_sessions` | Reads your manual Excel strength logs with sets, reps, weight, RPE |
+| `get_strength_sessions` | Strength and mobility sessions from the database: exercises, sets, reps, weight, RPE, done/skipped |
+| `get_body_metrics` | Bodyweight, calories, protein, and sleep from the database |
 | `get_training_load_trend` | Week-by-week session counts and duration over the last N weeks |
 
 ---
@@ -97,9 +127,13 @@ After a gym session, log it in an Excel file so Claude can see your exercises, w
 **Columns:** Exercise | Sets | Reps | Weight (kg) | RPE (1-10) | Done | Notes
 
 A template is at `data/manual/strength/2026-05-24.example.xlsx` — copy it, rename to today's date,
-fill in what you did. That's it.
+fill in what you did, then run:
 
-Claude reads these automatically when you ask about strength sessions or when generating your next plan.
+```bash
+python sync.py manual
+```
+
+This loads the file into the database so Claude can query it. Do the same after updating `body_metrics.xlsx`.
 
 ---
 
@@ -125,19 +159,20 @@ auto-detect only a portion of the workout (or misidentify it as swimming).
 | Outdoor cycling, running, hiking | Garmin | Auto-syncs to Intervals.icu |
 | Gym sessions | Whoop app (manual start) | Auto-syncs to Whoop DB |
 | Recovery, HRV, sleep | Whoop | Auto-syncs to Whoop DB |
-| Strength detail (sets/reps/weight) | Excel log | You write it after each session |
+| Strength detail (sets/reps/weight) | Excel log | You write it, then run `sync.py manual` |
+| Body metrics (weight, calories, sleep) | Excel log | You write it, then run `sync.py manual` |
 
 ---
 
 ## Keeping data fresh
 
-Run these from the project folder to sync the latest data before a planning conversation:
+Run this from the project folder to sync the latest data before a planning conversation:
 
 ```bash
-python src/whoop/sync.py
-python src/intervals/sync.py
+python sync.py all           # incremental — picks up from last record
+python sync.py all --days 7  # force re-sync last 7 days
 ```
 
-Run these manually before a planning session if you want the most up-to-date picture.
+Run manually before a planning session if you want the most up-to-date picture.
 
 > **Daily email:** Your workout for the day is automatically emailed to you at 6:30 AM every morning — no need to open VS Code. See `docs/setup-daily-email.md` for details.

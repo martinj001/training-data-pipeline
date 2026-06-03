@@ -7,8 +7,10 @@ Usage:
   python sync.py intervals              — sync Intervals.icu (Zwift + Garmin activities)
   python sync.py intervals --days 60    — sync last 60 days
   python sync.py trainingpeaks          — ingest all TrainingPeaks zip files
-  python sync.py all                    — run whoop + intervals (incremental)
-  python sync.py all --days 14          — run whoop + intervals for last 14 days
+  python sync.py manual                 — ingest manual Excel logs (last 30 days)
+  python sync.py manual --days 0        — ingest all manual logs
+  python sync.py all                    — run whoop + intervals + manual (incremental)
+  python sync.py all --days 14          — run all sources for last 14 days
 """
 import sys
 import subprocess
@@ -21,7 +23,10 @@ SOURCES = {
     "whoop": ROOT / "src" / "whoop" / "sync.py",
     "intervals": ROOT / "src" / "intervals" / "sync.py",
     "trainingpeaks": ROOT / "src" / "trainingpeaks" / "ingestor.py",
+    "manual": ROOT / "src" / "manual" / "sync.py",
 }
+
+ALL_SOURCES = ["whoop", "intervals", "manual"]
 
 
 def run(name, script, days=None):
@@ -51,7 +56,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     if source == "all":
-        for name in ["whoop", "intervals"]:
+        for name in ALL_SOURCES:
             run(name, SOURCES[name], args.days)
     else:
         run(source, SOURCES[source], args.days)

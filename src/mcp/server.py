@@ -1,5 +1,7 @@
 import sqlite3
-from datetime import datetime, timedelta
+import subprocess
+import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 
@@ -7,9 +9,15 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 WHOOP_DB = PROJECT_ROOT / "data" / "whoop.db"
 INTERVALS_DB = PROJECT_ROOT / "data" / "intervals.db"
 TP_DB = PROJECT_ROOT / "data" / "trainingpeaks.db"
+MANUAL_DB = PROJECT_ROOT / "data" / "manual.db"
 STRENGTH_DIR = PROJECT_ROOT / "data" / "manual" / "strength"
 
 mcp = FastMCP("training-data")
+
+
+def _utc_to_local_date(ts: str) -> str:
+    """Convert a UTC ISO timestamp (Z suffix) to local date string YYYY-MM-DD."""
+    return datetime.fromisoformat(ts.replace("Z", "+00:00")).astimezone().strftime("%Y-%m-%d")
 
 # Intervals.icu activity types → pillar
 INTERVALS_PILLAR = {
@@ -49,17 +57,15 @@ def classify_pillar(activity_type: str) -> str:
     return "cardio"
 
 
-def _count_recent_strength_files(days: int) -> int:
-    if not STRENGTH_DIR.exists():
+def _count_recent_strength_sessions(days: int) -> int:
+    if not MANUAL_DB.exists():
         return 0
-    cutoff = datetime.now() - timedelta(days=days)
-    count = 0
-    for f in STRENGTH_DIR.glob("*.xlsx"):
-        try:
-            if datetime.strptime(f.stem, "%Y-%m-%d") >= cutoff:
-                count += 1
-        except ValueError:
-            pass
+    cutoff = (datetime.now() - timedelta(days=days)).date().isoformat()
+    conn = sqlite3.connect(str(MANUAL_DB))
+    count = conn.execute(
+        "SELECT COUNT(DISTINCT date) FROM strength_sessions WHERE date >= ?", (cutoff,)
+    ).fetchone()[0]
+    conn.close()
     return count
 
 
@@ -129,7 +135,7 @@ def get_recent_workouts(days: int = 7) -> str:
 
     # Whoop: strength and mobility sessions (gym, yoga, etc.)
     # Skip cardio sport_ids — those are already covered by Intervals.icu
-    whoop_since = (datetime.now() - timedelta(days=days)).isoformat()
+    whoop_since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
     if WHOOP_DB.exists():
         conn = sqlite3.connect(str(WHOOP_DB))
         conn.row_factory = sqlite3.Row
@@ -148,7 +154,7 @@ def get_recent_workouts(days: int = 7) -> str:
                 name, pillar = "Run", "cardio"
             else:
                 name, pillar = "Gym", "strength"
-            date = str(r["start"])[:10]
+            date = _utc_to_local_date(r["start"])
             total_milli = sum(r[k] or 0 for k in (
                 "zone_zero_milli", "zone_one_milli", "zone_two_milli",
                 "zone_three_milli", "zone_four_milli", "zone_five_milli"
@@ -259,7 +265,7 @@ def get_weekly_pillar_summary() -> str:
             pillars[classify_pillar(sport)].append(f"{sport} (TP)")
 
     # Whoop: strength and mobility sessions
-    whoop_since = (datetime.now() - timedelta(days=7)).isoformat()
+    whoop_since = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
     if WHOOP_DB.exists():
         conn = sqlite3.connect(str(WHOOP_DB))
         conn.row_factory = sqlite3.Row
@@ -278,7 +284,7 @@ def get_weekly_pillar_summary() -> str:
             pillars[pillar].append(f"{name} (Whoop)")
 
     # Strength and mobility from manual Excel logs
-    manual_strength = _count_recent_strength_files(days=7)
+    manual_strength = _count_recent_strength_sessions(days=7)
 
     # Recovery average from Whoop
     conn = sqlite3.connect(str(WHOOP_DB))
@@ -305,52 +311,52 @@ def get_weekly_pillar_summary() -> str:
 @mcp.tool()
 def get_strength_sessions(days: int = 14) -> str:
     """
-    Read recent strength sessions from the manual Excel logs in data/manual/strength/.
-    Returns exercises, sets, reps, weight, and RPE for each session.
-    Mobility work (yoga, Foundation Training) logged in those files is also shown.
+    Read recent strength sessions from manual.db (ingested from data/manual/strength/ Excel logs).
+    Returns exercises, sets, reps, weight, RPE, and done status per session.
+    Mobility work (yoga, Foundation Training) is also shown.
+    Run 'python sync.py manual' to ingest new logs before calling this.
     """
-    if not STRENGTH_DIR.exists():
-        return "No strength log directory found. Start logging at data/manual/strength/YYYY-MM-DD.xlsx."
+    if not MANUAL_DB.exists():
+        return "manual.db not found. Run 'python sync.py manual' first."
 
-    try:
-        import openpyxl
-    except ImportError:
-        return "openpyxl not installed."
+    cutoff = (datetime.now() - timedelta(days=days)).date().isoformat()
+    conn = sqlite3.connect(str(MANUAL_DB))
+    conn.row_factory = sqlite3.Row
 
-    cutoff = datetime.now() - timedelta(days=days)
-    recent = sorted(
-        [(datetime.strptime(f.stem, "%Y-%m-%d"), f)
-         for f in STRENGTH_DIR.glob("*.xlsx")
-         if not f.name.startswith("~") and len(f.stem) == 10],
-        reverse=True
-    )
-    recent = [(d, f) for d, f in recent if d >= cutoff]
+    dates = [r[0] for r in conn.execute(
+        "SELECT DISTINCT date FROM strength_sessions WHERE date >= ? ORDER BY date DESC",
+        (cutoff,)
+    ).fetchall()]
 
-    if not recent:
+    if not dates:
+        conn.close()
         return f"No strength sessions logged in the last {days} days."
 
-    lines = [f"Strength/mobility sessions — last {days} days ({len(recent)} session(s)):\n"]
-    for date, f in recent:
-        lines.append(f"\n  {date.strftime('%Y-%m-%d')}:")
-        try:
-            wb = openpyxl.load_workbook(f, data_only=True)
-            ws = wb.active
-            for row in ws.iter_rows(min_row=2, values_only=True):
-                cols = (list(row) + [None] * 7)[:7]
-                exercise, sets, reps, weight, rpe, done, notes = cols
-                if not exercise:
-                    continue
-                parts = [f"    {exercise}"]
-                if sets and reps:
-                    parts.append(f"{int(sets)}x{int(reps)}")
-                if weight:
-                    parts.append(f"@ {weight}kg")
-                if rpe:
-                    parts.append(f"RPE {rpe}")
-                lines.append(" ".join(str(p) for p in parts))
-        except Exception as e:
-            lines.append(f"    (Could not read: {e})")
+    lines = [f"Strength/mobility sessions — last {days} days ({len(dates)} session(s)):\n"]
+    for session_date in dates:
+        rows = conn.execute(
+            """SELECT exercise, set_num, reps, weight, rpe, done, time_sec, notes
+               FROM strength_sessions WHERE date = ? ORDER BY rowid""",
+            (session_date,)
+        ).fetchall()
+        lines.append(f"\n  {session_date}:")
+        for r in rows:
+            parts = [f"    {r['exercise']}"]
+            if r["set_num"] and r["reps"]:
+                parts.append(f"{r['set_num']}x{r['reps']}")
+            if r["weight"]:
+                parts.append(f"@ {r['weight']}")
+            if r["rpe"]:
+                parts.append(f"RPE {r['rpe']}")
+            if r["done"]:
+                parts.append(f"[{'done' if r['done'] == 'Y' else 'skipped'}]")
+            if r["time_sec"]:
+                parts.append(f"{r['time_sec']}s")
+            if r["notes"]:
+                parts.append(f"({r['notes']})")
+            lines.append(" ".join(str(p) for p in parts))
 
+    conn.close()
     return "\n".join(lines)
 
 
@@ -392,73 +398,46 @@ def get_training_load_trend(weeks: int = 6) -> str:
     return "\n".join(lines)
 
 
-BODY_METRICS_FILE = PROJECT_ROOT / "data" / "manual" / "body_metrics.xlsx"
 PLANS_DIR = PROJECT_ROOT / "data" / "plans"
 
 
 @mcp.tool()
 def get_body_metrics(days: int = 14) -> str:
     """
-    Read body metrics from the rolling daily log (data/manual/body_metrics.xlsx).
+    Read body metrics from manual.db (ingested from data/manual/body_metrics.xlsx).
     Shows bodyweight, calories, protein, and sleep for the last N days.
-    Fill in the spreadsheet after each day and this tool will reflect it immediately.
+    Run 'python sync.py manual' after updating the spreadsheet.
     """
-    if not BODY_METRICS_FILE.exists():
-        return "No body metrics log found. Start logging at data/manual/body_metrics.xlsx."
+    if not MANUAL_DB.exists():
+        return "manual.db not found. Run 'python sync.py manual' first."
 
-    try:
-        import openpyxl
-    except ImportError:
-        return "openpyxl not installed."
+    cutoff = (datetime.now() - timedelta(days=days)).date().isoformat()
+    conn = sqlite3.connect(str(MANUAL_DB))
+    conn.row_factory = sqlite3.Row
 
-    from datetime import date as date_cls
-
-    cutoff = (datetime.now() - timedelta(days=days)).date()
-
-    def parse_date(val):
-        if val is None:
-            return None
-        if isinstance(val, datetime):
-            return val.date()
-        if isinstance(val, date_cls):
-            return val
-        try:
-            return datetime.strptime(str(val)[:10], "%Y-%m-%d").date()
-        except ValueError:
-            return None
-
-    try:
-        wb = openpyxl.load_workbook(str(BODY_METRICS_FILE), data_only=True)
-        ws = wb.active
-    except Exception as e:
-        return f"Could not read body_metrics.xlsx: {e}"
-
-    rows = []
-    for row in ws.iter_rows(min_row=2, values_only=True):
-        cols = (list(row) + [None] * 6)[:6]
-        date_val, weight, calories, protein, sleep, notes = cols
-        row_date = parse_date(date_val)
-        if row_date is None or row_date < cutoff:
-            continue
-        rows.append((row_date, weight, calories, protein, sleep, notes))
+    rows = conn.execute(
+        """SELECT date, weight_kg, calories, protein_g, sleep_hrs, notes
+           FROM body_metrics WHERE date >= ? ORDER BY date DESC""",
+        (cutoff,)
+    ).fetchall()
+    conn.close()
 
     if not rows:
         return f"No body metrics logged in the last {days} days."
 
-    rows.sort(key=lambda r: r[0], reverse=True)
     lines = [f"Body metrics — last {days} days ({len(rows)} day(s)):\n"]
-    for row_date, weight, calories, protein, sleep, notes in rows:
-        parts = [f"  {row_date}"]
-        if weight is not None:
-            parts.append(f"weight {weight}kg")
-        if calories is not None:
-            parts.append(f"calories {int(calories)}kcal")
-        if protein is not None:
-            parts.append(f"protein {int(protein)}g")
-        if sleep is not None:
-            parts.append(f"sleep {sleep}h")
-        if notes:
-            parts.append(f"({notes})")
+    for r in rows:
+        parts = [f"  {r['date']}"]
+        if r["weight_kg"] is not None:
+            parts.append(f"weight {r['weight_kg']}kg")
+        if r["calories"] is not None:
+            parts.append(f"calories {int(r['calories'])}kcal")
+        if r["protein_g"] is not None:
+            parts.append(f"protein {int(r['protein_g'])}g")
+        if r["sleep_hrs"] is not None:
+            parts.append(f"sleep {r['sleep_hrs']}h")
+        if r["notes"]:
+            parts.append(f"({r['notes']})")
         lines.append(" | ".join(parts))
 
     return "\n".join(lines)
@@ -489,6 +468,44 @@ def write_plan(filename: str, content: str) -> str:
     path = PLANS_DIR / f"{filename}.md"
     path.write_text(content, encoding="utf-8")
     return f"Plan written to {path.name}"
+
+
+_VENV_PYTHON = PROJECT_ROOT / ".venv" / "Scripts" / "python.exe"
+_SYNC_SCRIPT = PROJECT_ROOT / "sync.py"
+
+
+@mcp.tool()
+def sync_data(source: str = "all", days: int = None) -> str:
+    """
+    Pull the latest training data from all sources (Whoop, Intervals.icu, manual Excel logs).
+    Call this before any planning session to ensure Claude has up-to-date data.
+    source: 'all', 'whoop', 'intervals', or 'manual' (default: 'all')
+    days: how far back to re-sync; omit to pick up from last record
+    """
+    python = str(_VENV_PYTHON) if _VENV_PYTHON.exists() else sys.executable
+    cmd = [python, str(_SYNC_SCRIPT), source]
+    if days is not None:
+        cmd += ["--days", str(days)]
+
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=str(PROJECT_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+    except subprocess.TimeoutExpired:
+        return "Sync timed out after 3 minutes."
+
+    output = result.stdout.strip()
+    if result.stderr.strip():
+        output += f"\n\nWarnings:\n{result.stderr.strip()}"
+
+    if result.returncode != 0:
+        return f"Sync failed (exit {result.returncode}):\n{output}"
+
+    return output or "Sync complete — all sources up to date."
 
 
 if __name__ == "__main__":
