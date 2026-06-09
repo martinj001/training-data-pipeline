@@ -116,24 +116,50 @@ Claude will pull your data, ask any clarifying questions, then write the plan to
 You can open them in VS Code anytime to read or review. If you want a change, just tell Claude:
 > "Swap Thursday and Friday in week 2" or "Add an extra run in week 1."
 
+Once the plan is finalized, generate the strength workbooks for the block:
+
+```bash
+python src/manual/build_workbooks.py
+```
+
 ---
 
 ## Logging your strength sessions
 
-After a gym session, log it in an Excel file so Claude can see your exercises, weights, and RPE.
+At the start of each block, pre-populated workbooks are generated automatically — one per strength
+session, with target exercises, sets, reps, and weights already filled in.
 
-**File location:** `data/manual/strength/YYYY-MM-DD.xlsx`
+**Generate workbooks for the current block:**
 
-**Columns:** Exercise | Sets | Reps | Weight (kg) | RPE (1-10) | Done | Notes
+```bash
+python src/manual/build_workbooks.py
+```
 
-A template is at `data/manual/strength/2026-05-24.example.xlsx` — copy it, rename to today's date,
-fill in what you did, then run:
+This reads the most recent plan file and creates one xlsx per strength day in `data/manual/strength/`.
+Run it once per block (every other Sunday). Use `--force` to regenerate if the plan changed.
+
+**During the session:**
+
+Open today's file (e.g. `data/manual/strength/2026-06-08.xlsx`). You'll see:
+
+| Column | Pre-filled? | You fill in |
+|--------|-------------|-------------|
+| Exercise | ✓ | — |
+| Set | ✓ | — |
+| Reps | ✓ target | adjust if you did more/fewer |
+| Weight (lbs) | ✓ target | adjust if you went up/down |
+| RPE (1-10) | — | after every set |
+| Done | — | Y when the set is complete |
+| Time (seconds) | ✓ for timed exercises | — |
+| Notes | ✓ cues on key sets | add anything useful |
+
+**After the session, load it into the database:**
 
 ```bash
 python sync.py manual
 ```
 
-This loads the file into the database so Claude can query it. Do the same after updating `body_metrics.xlsx`.
+Do the same after updating `body_metrics.xlsx`.
 
 ---
 
