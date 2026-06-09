@@ -65,6 +65,8 @@ def ingest_strength(conn: sqlite3.Connection, since: date) -> tuple[int, int]:
             continue
         if since and file_date < since:
             continue
+        if file_date > date.today():
+            continue
         if f.stem in existing:
             skipped += 1
             continue
