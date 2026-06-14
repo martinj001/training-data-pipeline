@@ -202,3 +202,38 @@ python sync.py all --days 7  # force re-sync last 7 days
 Run manually before a planning session if you want the most up-to-date picture.
 
 > **Daily email:** Your workout for the day is automatically emailed to you at 6:30 AM every morning — no need to open VS Code. See `docs/setup-daily-email.md` for details.
+
+---
+
+## Troubleshooting sync errors
+
+### Whoop — token expired or revoked
+
+**Symptom:** Sync fails with `KeyError: 'access_token'` or `RuntimeError: Token refresh failed`.
+
+Whoop issues two tokens when you authenticate:
+- An **access token** that expires every ~1 hour (refreshed automatically)
+- A **refresh token** that stays valid long-term but can be revoked by Whoop at any time — app updates, signing in/out on your phone, or a server-side security reset are common triggers
+
+When the refresh token is revoked, the automatic refresh fails and you need to re-authenticate manually.
+
+**Fix — re-authenticate Whoop:**
+
+```bat
+cd C:\Users\marti\dev\training-data-pipeline
+.venv\Scripts\python.exe src/whoop/auth.py
+```
+
+This opens a browser window. Log in with your Whoop credentials. Once the page says "Authentication successful!", close the tab and re-run the sync:
+
+```bat
+.venv\Scripts\python.exe sync.py whoop --days 7
+```
+
+---
+
+### Intervals.icu — sync errors
+
+*(No issues encountered yet — placeholder for future troubleshooting steps.)*
+
+---
