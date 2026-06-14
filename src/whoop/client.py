@@ -46,6 +46,8 @@ def whoop_get(endpoint, params=None):
     if response.status_code == 401:
         refresh_access_token()
         response = requests.get(f"{BASE_URL}{endpoint}", headers=get_headers(), params=params)
+    if not response.content:
+        return {}
     return response.json()
 
 
