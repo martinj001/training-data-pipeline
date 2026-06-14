@@ -29,6 +29,8 @@ def refresh_access_token():
         "client_secret": os.getenv("WHOOP_CLIENT_SECRET"),
     })
     new_tokens = response.json()
+    if "access_token" not in new_tokens:
+        raise RuntimeError(f"Token refresh failed: {new_tokens}")
     save_tokens(new_tokens)
     print("Access token refreshed.")
     return new_tokens
