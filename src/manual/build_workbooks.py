@@ -42,7 +42,8 @@ MONTH_MAP = {
 # time_sec: seconds for timed exercises (plank, holds), else None
 
 def session_a(week: int) -> list[tuple]:
-    pullup_reps = 6 if week == 1 else 7
+    pullup_reps = 7 if week == 1 else 8
+    ohp_weight  = 50 if week == 1 else 55
     rows = [
         # warm-up
         ("Mobility", None, None, None, None, None),
@@ -59,13 +60,13 @@ def session_a(week: int) -> list[tuple]:
         ("Push-Ups-incline-superset", 2, 10, "Body Weight", None, None),
         ("Push-Ups-incline-superset", 3, 10, "Body Weight", None, None),
         # dumbbell row
-        ("Dumbbell Row", 1, 10, 30, None, None),
-        ("Dumbbell Row", 2, 10, 30, None, None),
-        ("Dumbbell Row", 3, 10, 30, None, "drop to 25 if form breaks"),
+        ("Dumbbell Row", 1, 10, 35, None, None),
+        ("Dumbbell Row", 2, 10, 35, None, None),
+        ("Dumbbell Row", 3, 10, 35, None, "drop to 30 if form breaks"),
         # overhead press
-        ("Dumbbell Overhead Press", 1, 8, 45, None, None),
-        ("Dumbbell Overhead Press", 2, 8, 45, None, None),
-        ("Dumbbell Overhead Press", 3, 8, 45, None, "stay at 40 if form breaks on rep 6"),
+        ("Dumbbell Overhead Press", 1, 8, ohp_weight, None, None),
+        ("Dumbbell Overhead Press", 2, 8, ohp_weight, None, None),
+        ("Dumbbell Overhead Press", 3, 8, ohp_weight, None, "stay at 50 if form breaks on rep 6" if week == 2 else None),
         # core finisher
         ("Dead Bug", 1, None, None, 30, "alternate arm/leg, lower back down"),
         ("Dead Bug", 2, None, None, 30, None),
@@ -81,26 +82,27 @@ def session_a(week: int) -> list[tuple]:
 
 
 def session_b(week: int) -> list[tuple]:
-    rdl_weights  = [45, 65, 75, 88]  if week == 1 else [50, 70, 80, 95]
-    lunge_weight = 40               if week == 1 else 45
-    squat_note   = "try 145 on last set if 135 felt good" if week == 2 else None
+    rdl_weights  = [50, 70, 80, 95]  if week == 1 else [55, 75, 85, 100]
+    lunge_weight = 45                if week == 1 else 50
+    squat_last   = 145               if week == 1 else 145
+    squat_note   = "145 attempt — deferred from block 2" if week == 1 else "hold 145 or try 150 if week 1 felt clean"
     rows = [
         # warm-up
         ("Mobility", None, None, None, None, None),
         # squat
-        ("Squat", 1, 10, 95,  None, None),
-        ("Squat", 2, 10, 115, None, None),
-        ("Squat", 3, 10, 115, None, None),
-        ("Squat", 4, 10, 135, None, squat_note),
+        ("Squat", 1, 10, 95,         None, None),
+        ("Squat", 2, 10, 115,        None, None),
+        ("Squat", 3, 10, 135,        None, None),
+        ("Squat", 4, 10, squat_last, None, squat_note),
         # rdl
-        ("Romanian Deadlift", 1, 8, rdl_weights[0], None, None),
-        ("Romanian Deadlift", 2, 8, rdl_weights[1], None, None),
-        ("Romanian Deadlift", 3, 8, rdl_weights[2], None, None),
-        ("Romanian Deadlift", 4, 8, rdl_weights[3], None, "own the hinge"),
+        ("Romanian Deadlift", 1, 10, rdl_weights[0], None, None),
+        ("Romanian Deadlift", 2, 10, rdl_weights[1], None, None),
+        ("Romanian Deadlift", 3, 10, rdl_weights[2], None, None),
+        ("Romanian Deadlift", 4, 10, rdl_weights[3], None, "own the hinge"),
         # kb swings — must not skip
-        ("Kettlebell Swing", 1, 10, 26, None, "hip drive, not a squat"),
-        ("Kettlebell Swing", 2, 10, 26, None, None),
-        ("Kettlebell Swing", 3, 10, 26, None, None),
+        ("Kettlebell Swing", 1, 12, 26, None, "hip drive, not a squat"),
+        ("Kettlebell Swing", 2, 12, 26, None, None),
+        ("Kettlebell Swing", 3, 12, 26, None, None),
         # reverse lunges
         ("Reverse Lunge", 1, 10, lunge_weight, None, "each leg"),
         ("Reverse Lunge", 2, 10, lunge_weight, None, None),

@@ -8,8 +8,9 @@ data/manual/strength/*
 !data/manual/strength/*.example.xlsx
 !data/plans/
 
-# Claude Code local settings - machine specific
-.claude/
+# Claude Code - ignore local/machine-specific files, but commit project hooks
+.claude/*
+!.claude/settings.json
 
 # Environment variables and tokens - never commit
 .env

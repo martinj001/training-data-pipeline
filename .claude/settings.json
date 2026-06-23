@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "command": "$input = $input | ConvertFrom-Json; $fp = $input.tool_input.file_path; if ($fp -match 'data[/\\\\]plans[/\\\\].*\\.md$') { Set-Location 'c:\\Users\\marti\\dev\\training-data-pipeline'; python src/manual/build_workbooks.py --plan $fp } 2>$null",
+            "statusMessage": "Generating strength workbooks from plan...",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
