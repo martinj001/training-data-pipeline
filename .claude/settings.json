@@ -12,6 +12,18 @@
             "timeout": 30
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "python 'c:/Users/marti/dev/training-data-pipeline/.claude/push_plan.py'",
+            "statusMessage": "Pushing plan update to GitHub...",
+            "timeout": 60
+          }
+        ]
       }
     ]
   }
