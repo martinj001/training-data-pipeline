@@ -47,45 +47,46 @@ def session_a(week: int) -> list[tuple]:
     rows = [
         # warm-up
         ("Mobility", None, None, None, None, None),
-        # pull-ups
-        ("Pull-Ups", 1, pullup_reps, "Body Weight", None, None),
-        ("Pull-Ups", 2, pullup_reps, "Body Weight", None, None),
-        ("Pull-Ups", 3, pullup_reps, "Body Weight", None, None),
-        ("Pull-Ups", 4, pullup_reps, "Body Weight", None, "drop a rep on set 4 is fine" if week == 2 else None),
-        # push-up superset
-        ("Push-Ups", 1, 10, "Body Weight", None, None),
-        ("Push-Ups", 2, 10, "Body Weight", None, None),
-        ("Push-Ups", 3, 10, "Body Weight", None, None),
-        ("Push-Ups-incline-superset", 1, 10, "Body Weight", None, None),
-        ("Push-Ups-incline-superset", 2, 10, "Body Weight", None, None),
-        ("Push-Ups-incline-superset", 3, 10, "Body Weight", None, None),
-        # dumbbell row
-        ("Dumbbell Row", 1, 10, 35, None, None),
-        ("Dumbbell Row", 2, 10, 35, None, None),
-        ("Dumbbell Row", 3, 10, 35, None, "drop to 30 if form breaks"),
-        # overhead press
-        ("Dumbbell Overhead Press", 1, 8, ohp_weight, None, None),
-        ("Dumbbell Overhead Press", 2, 8, ohp_weight, None, None),
-        ("Dumbbell Overhead Press", 3, 8, ohp_weight, None, "stay at 50 if form breaks on rep 6" if week == 2 else None),
+        # pull-ups / calf raises superset — do calf raises immediately after each set
+        ("Pull-Ups",    1, pullup_reps, "Body Weight", None, None),
+        ("Calf Raises", 1, 15,          "Body Weight", None, "2-sec up, pause at top, 2-sec down"),
+        ("Pull-Ups",    2, pullup_reps, "Body Weight", None, None),
+        ("Calf Raises", 2, 15,          "Body Weight", None, None),
+        ("Pull-Ups",    3, pullup_reps, "Body Weight", None, None),
+        ("Calf Raises", 3, 15,          "Body Weight", None, None),
+        ("Pull-Ups",    4, pullup_reps, "Body Weight", None, "drop a rep on set 4 is fine" if week == 2 else None),
+        ("Calf Raises", 4, 15,          "Body Weight", None, "add 25 lb DB when bodyweight feels trivial"),
+        # dips
+        ("Dips", 1, 9, "Body Weight", None, None),
+        ("Dips", 2, 9, "Body Weight", None, None),
+        ("Dips", 3, 9, "Body Weight", None, "sub: push-up superset (10 standard + 10 incline) if unavailable"),
+        # kb row (single arm)
+        ("KB Row", 1, 10, 44, None, None),
+        ("KB Row", 2, 10, 44, None, None),
+        ("KB Row", 3, 10, 44, None, "drop to 35 if form breaks"),
+        # barbell overhead press (standing)
+        ("Barbell Overhead Press", 1, 10, ohp_weight, None, None),
+        ("Barbell Overhead Press", 2, 10, ohp_weight, None, None),
+        ("Barbell Overhead Press", 3, 10, ohp_weight, None, "stay at 50 if form breaks on rep 8" if week == 2 else None),
         # core finisher
-        ("Dead Bug", 1, None, None, 30, "alternate arm/leg, lower back down"),
-        ("Dead Bug", 2, None, None, 30, None),
-        ("Dead Bug", 3, None, None, 30, None),
-        ("Hollow Hold", 1, None, None, 30, None),
-        ("Hollow Hold", 2, None, None, 30, None),
-        ("Hollow Hold", 3, None, None, 30, None),
-        ("Push-Up to Downward Dog", 1, 10, "Body Weight", None, None),
-        ("Push-Up to Downward Dog", 2, 10, "Body Weight", None, None),
-        ("Push-Up to Downward Dog", 3, 10, "Body Weight", None, None),
+        ("Dead Bug",                1, None, None,          30, "alternate arm/leg, lower back glued down"),
+        ("Dead Bug",                2, None, None,          30, None),
+        ("Dead Bug",                3, None, None,          30, None),
+        ("Hollow Hold",             1, None, None,          30, None),
+        ("Hollow Hold",             2, None, None,          30, None),
+        ("Hollow Hold",             3, None, None,          30, None),
+        ("Push-Up to Downward Dog", 1, 10,   "Body Weight", None, None),
+        ("Push-Up to Downward Dog", 2, 10,   "Body Weight", None, None),
+        ("Push-Up to Downward Dog", 3, 10,   "Body Weight", None, None),
     ]
     return rows
 
 
 def session_b(week: int) -> list[tuple]:
-    rdl_weights  = [50, 70, 80, 95]  if week == 1 else [55, 75, 85, 100]
-    lunge_weight = 45                if week == 1 else 50
-    squat_last   = 145               if week == 1 else 145
-    squat_note   = "145 attempt — deferred from block 2" if week == 1 else "hold 145 or try 150 if week 1 felt clean"
+    rdl_weights = [50, 70, 80, 95]  if week == 1 else [55, 75, 85, 100]
+    bss_weight  = 35                 if week == 1 else 44   # KB held at chest
+    squat_last  = 150                if week == 1 else 150
+    squat_note  = "try 150 — 145 felt clean in block 3 (RPE 7.5)" if week == 1 else "hold 150 or try 155 if week 1 felt clean"
     rows = [
         # warm-up
         ("Mobility", None, None, None, None, None),
@@ -99,21 +100,24 @@ def session_b(week: int) -> list[tuple]:
         ("Romanian Deadlift", 2, 10, rdl_weights[1], None, None),
         ("Romanian Deadlift", 3, 10, rdl_weights[2], None, None),
         ("Romanian Deadlift", 4, 10, rdl_weights[3], None, "own the hinge"),
-        # kb swings — must not skip
-        ("Kettlebell Swing", 1, 12, 26, None, "hip drive, not a squat"),
-        ("Kettlebell Swing", 2, 12, 26, None, None),
-        ("Kettlebell Swing", 3, 12, 26, None, None),
-        # reverse lunges
-        ("Reverse Lunge", 1, 10, lunge_weight, None, "each leg"),
-        ("Reverse Lunge", 2, 10, lunge_weight, None, None),
-        ("Reverse Lunge", 3, 10, lunge_weight, None, None),
+        # kb swings
+        ("Kettlebell Swing", 1, 15, 35, None, "hip drive, not a squat"),
+        ("Kettlebell Swing", 2, 15, 35, None, None),
+        ("Kettlebell Swing", 3, 15, 35, None, None),
+        # bulgarian split squats / calf raises superset
+        ("Bulgarian Split Squat", 1, 8, bss_weight,    None, "each leg — rear foot elevated; find your footing first set"),
+        ("Calf Raises",           1, 15, "Body Weight", None, "2-sec up, pause at top, 2-sec down"),
+        ("Bulgarian Split Squat", 2, 8, bss_weight,    None, None),
+        ("Calf Raises",           2, 15, "Body Weight", None, None),
+        ("Bulgarian Split Squat", 3, 8, bss_weight,    None, None),
+        ("Calf Raises",           3, 15, "Body Weight", None, None),
         # core finisher
-        ("Plank", 1, None, None, 90, "posterior tilt — tuck pelvis"),
-        ("Plank", 2, None, None, 90, None),
-        ("Plank", 3, None, None, 90, None),
-        ("Ab Wheel Rollout", 1, 10, None, None, None),
-        ("Ab Wheel Rollout", 2, 10, None, None, None),
-        ("Ab Wheel Rollout", 3, 10, None, None, None),
+        ("Plank",               1, None, None,          90, "posterior tilt — tuck pelvis"),
+        ("Plank",               2, None, None,          90, None),
+        ("Plank",               3, None, None,          90, None),
+        ("Hanging Knee Raises", 1, 10,   "Body Weight", None, "on pull-up bar — progress to straight-leg when easy"),
+        ("Hanging Knee Raises", 2, 10,   "Body Weight", None, None),
+        ("Hanging Knee Raises", 3, 10,   "Body Weight", None, None),
     ]
     return rows
 
