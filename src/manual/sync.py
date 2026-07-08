@@ -6,7 +6,9 @@ Usage:
   python src/manual/sync.py --days 90   # ingest last 90 days
   python src/manual/sync.py --days 0    # ingest all time
 
-Skips dates already present in the database — safe to re-run.
+Re-ingests a file only when its mtime has changed since the last sync —
+safe to re-run, and edits to an already-synced file won't be silently
+dropped.
 """
 import sqlite3
 import argparse
@@ -43,16 +45,29 @@ def init_db(conn: sqlite3.Connection) -> None:
             sleep_hrs   REAL,
             notes       TEXT
         );
+
+        CREATE TABLE IF NOT EXISTS sync_meta (
+            source      TEXT PRIMARY KEY,
+            mtime       REAL NOT NULL
+        );
     """)
     conn.commit()
 
 
-def ingest_strength(conn: sqlite3.Connection, since: date) -> tuple[int, int]:
-    existing = {
-        row[0]
-        for row in conn.execute("SELECT DISTINCT date FROM strength_sessions")
-    }
+def _synced_mtime(conn: sqlite3.Connection, source: str) -> float | None:
+    row = conn.execute("SELECT mtime FROM sync_meta WHERE source = ?", (source,)).fetchone()
+    return row[0] if row else None
 
+
+def _mark_synced(conn: sqlite3.Connection, source: str, mtime: float) -> None:
+    conn.execute(
+        "INSERT INTO sync_meta (source, mtime) VALUES (?, ?) "
+        "ON CONFLICT(source) DO UPDATE SET mtime = excluded.mtime",
+        (source, mtime),
+    )
+
+
+def ingest_strength(conn: sqlite3.Connection, since: date) -> tuple[int, int]:
     files = sorted(STRENGTH_DIR.glob("*.xlsx"))
     ingested, skipped = 0, 0
 
@@ -67,9 +82,14 @@ def ingest_strength(conn: sqlite3.Connection, since: date) -> tuple[int, int]:
             continue
         if file_date > date.today():
             continue
-        if f.stem in existing:
+
+        source = f"strength:{f.stem}"
+        mtime = f.stat().st_mtime
+        if _synced_mtime(conn, source) == mtime:
             skipped += 1
             continue
+
+        conn.execute("DELETE FROM strength_sessions WHERE date = ?", (f.stem,))
 
         wb = openpyxl.load_workbook(f, read_only=True, data_only=True)
         ws = wb.active
@@ -98,6 +118,7 @@ def ingest_strength(conn: sqlite3.Connection, since: date) -> tuple[int, int]:
             )
             rows_inserted += 1
         wb.close()
+        _mark_synced(conn, source, mtime)
         conn.commit()
         ingested += 1
         print(f"  strength: {f.stem} ({rows_inserted} rows)")
@@ -110,10 +131,18 @@ def ingest_body_metrics(conn: sqlite3.Connection, since: date) -> tuple[int, int
         print("  body_metrics.xlsx not found — skipping")
         return 0, 0
 
-    existing = {
-        row[0]
-        for row in conn.execute("SELECT date FROM body_metrics")
-    }
+    source = "body_metrics"
+    mtime = BODY_METRICS_FILE.stat().st_mtime
+    if _synced_mtime(conn, source) == mtime:
+        skipped = conn.execute(
+            "SELECT COUNT(*) FROM body_metrics WHERE date >= ?",
+            (since.isoformat(),),
+        ).fetchone()[0]
+        return 0, skipped
+
+    # File changed since last sync — refresh everything in the window so
+    # edits to already-synced rows aren't silently dropped.
+    conn.execute("DELETE FROM body_metrics WHERE date >= ?", (since.isoformat(),))
 
     wb = openpyxl.load_workbook(BODY_METRICS_FILE, read_only=True, data_only=True)
     ws = wb.active
@@ -131,9 +160,6 @@ def ingest_body_metrics(conn: sqlite3.Connection, since: date) -> tuple[int, int
             continue
         if since and parsed < since:
             continue
-        if row_date in existing:
-            skipped += 1
-            continue
 
         conn.execute(
             """INSERT INTO body_metrics (date, weight_kg, calories, protein_g, sleep_hrs, notes)
@@ -144,6 +170,7 @@ def ingest_body_metrics(conn: sqlite3.Connection, since: date) -> tuple[int, int
         print(f"  body_metrics: {row_date}")
 
     wb.close()
+    _mark_synced(conn, source, mtime)
     conn.commit()
     return ingested, skipped
 
