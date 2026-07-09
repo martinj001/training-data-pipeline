@@ -60,7 +60,7 @@ def sync_recovery(days=None):
     for r in records:
         score = r.get("score") or {}
         cursor.execute("""
-            INSERT OR IGNORE INTO recovery (
+            INSERT OR REPLACE INTO recovery (
                 cycle_id, sleep_id, created_at, updated_at, score_state,
                 recovery_score, resting_heart_rate, hrv_rmssd_milli,
                 spo2_percentage, skin_temp_celsius
@@ -76,7 +76,7 @@ def sync_recovery(days=None):
 
     conn.commit()
     conn.close()
-    print(f"Recovery sync complete: {inserted} new records saved.\n")
+    print(f"Recovery sync complete: {inserted} records synced (new or updated).\n")
 
 
 def sync_sleep(days=None):
@@ -92,7 +92,7 @@ def sync_sleep(days=None):
     for r in records:
         score = r.get("score") or {}
         cursor.execute("""
-            INSERT OR IGNORE INTO sleep (
+            INSERT OR REPLACE INTO sleep (
                 sleep_id, cycle_id, created_at, updated_at, start, end,
                 score_state, total_in_bed_time_milli, total_awake_time_milli,
                 total_light_sleep_time_milli, total_slow_wave_sleep_time_milli,
@@ -112,7 +112,7 @@ def sync_sleep(days=None):
 
     conn.commit()
     conn.close()
-    print(f"Sleep sync complete: {inserted} new records saved.\n")
+    print(f"Sleep sync complete: {inserted} records synced (new or updated).\n")
 
 
 def sync_workouts(days=None):
@@ -129,7 +129,7 @@ def sync_workouts(days=None):
         score = r.get("score") or {}
         zones = score.get("zone_duration") or {}
         cursor.execute("""
-            INSERT OR IGNORE INTO workouts (
+            INSERT OR REPLACE INTO workouts (
                 workout_id, created_at, updated_at, start, end, sport_id,
                 score_state, strain, average_heart_rate, max_heart_rate,
                 kilojoule, percent_recorded, zone_zero_milli, zone_one_milli,
@@ -149,7 +149,7 @@ def sync_workouts(days=None):
 
     conn.commit()
     conn.close()
-    print(f"Workout sync complete: {inserted} new records saved.\n")
+    print(f"Workout sync complete: {inserted} records synced (new or updated).\n")
 
 
 def sync_cycles(days=None):
@@ -165,7 +165,7 @@ def sync_cycles(days=None):
     for r in records:
         score = r.get("score") or {}
         cursor.execute("""
-            INSERT OR IGNORE INTO cycles (
+            INSERT OR REPLACE INTO cycles (
                 cycle_id, created_at, updated_at, start, end,
                 score_state, strain, kilojoule, average_heart_rate, max_heart_rate
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -179,7 +179,7 @@ def sync_cycles(days=None):
 
     conn.commit()
     conn.close()
-    print(f"Cycle sync complete: {inserted} new records saved.\n")
+    print(f"Cycle sync complete: {inserted} records synced (new or updated).\n")
 
 
 if __name__ == "__main__":
