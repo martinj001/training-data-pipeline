@@ -17,7 +17,7 @@ change. This script only turns that data into an .xlsx.
 
 import argparse
 import re
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import openpyxl
@@ -174,12 +174,57 @@ def build_workbook(out_path: Path, rows: list[tuple], session_label: str) -> Non
     wb.save(out_path)
 
 
+# ── pruning ───────────────────────────────────────────────────────────────────
+
+def is_unfilled(path: Path) -> bool:
+    """True if no RPE or Done value has been entered -- i.e. still exactly as
+    build_workbook() left it. Used to guard prune_orphaned() from ever
+    deleting a session that actually has logged data, even if a later plan
+    edit removed that date from the strength-day list."""
+    wb = openpyxl.load_workbook(path, data_only=True)
+    ws = wb.active
+    for row in ws.iter_rows(min_row=2):
+        rpe, done = row[4].value, row[5].value
+        if rpe not in (None, "") or done not in (None, ""):
+            return False
+    return True
+
+
+def prune_orphaned(plan_path: Path, strength_days: list[tuple[date, str]], dry_run: bool) -> None:
+    """Remove workbooks whose date falls inside this plan's block but is no
+    longer a strength day in it (e.g. a session got swapped to cardio after
+    the workbook was already built). Only ever removes untouched files."""
+    plan_start = date.fromisoformat(plan_path.stem)
+    plan_end   = plan_start + timedelta(days=13)  # 2-week block
+    current_dates = {d for d, _ in strength_days}
+
+    for f in sorted(STRENGTH_DIR.glob("*.xlsx")):
+        try:
+            file_date = date.fromisoformat(f.stem)
+        except ValueError:
+            continue
+        if not (plan_start <= file_date <= plan_end) or file_date in current_dates:
+            continue
+        if not is_unfilled(f):
+            print(f"  keep    {f.name}  (has logged data -- not touching)")
+            continue
+        if dry_run:
+            print(f"  would remove  {f.name}  (no longer a strength day in this plan)")
+        else:
+            f.unlink()
+            print(f"  removed {f.name}  (no longer a strength day in this plan)")
+
+
 # ── main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build pre-populated strength workbooks")
     parser.add_argument("--plan",  help="Path to plan markdown file (default: most recent)")
     parser.add_argument("--force", action="store_true", help="Overwrite existing files")
+    parser.add_argument("--prune", action="store_true",
+                         help="Remove workbooks for dates no longer marked Strength in this "
+                              "plan's block (only if untouched -- never removes logged data)")
+    parser.add_argument("--dry-run", action="store_true", help="With --prune, only show what would be removed")
     args = parser.parse_args()
 
     if args.plan:
@@ -222,6 +267,10 @@ def main() -> None:
         label = f"Session {session_type} — Week {week}"
         build_workbook(out_path, rows, label)
         print(f"  built {out_path.name}  ({label})")
+
+    if args.prune:
+        print("\nPruning orphaned workbooks...")
+        prune_orphaned(plan_path, strength_days, args.dry_run)
 
     print("Done.")
 
