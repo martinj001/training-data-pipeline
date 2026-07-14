@@ -16,6 +16,7 @@ Data sources:
 """
 
 import argparse
+import re
 import sqlite3
 import subprocess
 import sys
@@ -74,10 +75,11 @@ def parse_plan_targets(path: Path) -> dict[str, int]:
                 break
             parts = [p.strip() for p in line.split("|") if p.strip()]
             if len(parts) >= 2 and "---" not in parts[0]:
-                try:
-                    targets[parts[0]] = int(parts[1])
-                except ValueError:
-                    pass
+                # target cell may be a bare int ("4") or have trailing context
+                # ("1 (revised down from 4)") -- take the leading number either way
+                match = re.match(r"\d+", parts[1])
+                if match:
+                    targets[parts[0]] = int(match.group())
     return targets
 
 
