@@ -12,6 +12,7 @@ Usage:
   python sync.py all                    — run whoop + intervals + manual (incremental)
   python sync.py all --days 14          — run all sources for last 14 days
 """
+import os
 import sys
 import subprocess
 import argparse
@@ -28,12 +29,26 @@ SOURCES = {
 
 ALL_SOURCES = ["whoop", "intervals", "manual"]
 
+# Always use THIS repo's own venv, regardless of whatever python happens to be
+# active in the calling shell -- a different repo's venv being active (e.g.
+# after cd-ing over from another project) silently used the wrong
+# interpreter here before, causing ModuleNotFoundError for deps (openpyxl)
+# that only this repo's venv has installed.
+VENV_PYTHON = ROOT / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+
+
+def _python() -> str:
+    if VENV_PYTHON.exists():
+        return str(VENV_PYTHON)
+    print(f"Warning: {VENV_PYTHON} not found -- falling back to sys.executable ({sys.executable})", file=sys.stderr)
+    return sys.executable
+
 
 def run(name, script, days=None):
     print(f"\n{'='*40}", flush=True)
     print(f"  {name}", flush=True)
     print(f"{'='*40}", flush=True)
-    cmd = [sys.executable, str(script)]
+    cmd = [_python(), str(script)]
     if days is not None:
         cmd += ["--days", str(days)]
     result = subprocess.run(cmd, cwd=str(script.parent))
