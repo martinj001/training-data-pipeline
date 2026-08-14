@@ -2,8 +2,13 @@ import sys
 import argparse
 import sqlite3
 from datetime import datetime, timedelta
-from database import initialize_db, get_connection
+from database import initialize_db, get_connection, get_latest_updated_at
 from client import whoop_get
+
+# Whoop occasionally revises scores for a few days after the fact, so an
+# incremental sync steps back this many days from the last synced record
+# rather than resuming exactly where it left off.
+OVERLAP_DAYS = 7
 
 
 def parse_args():
@@ -13,15 +18,32 @@ def parse_args():
     return args.days
 
 
-def get_sync_start(days=None):
+def get_sync_start(days=None, table=None):
     """Return ISO start timestamp, or None for full history.
 
     --days N: sync last N days.
-    No flag: full history (no start filter).
+    No flag: incremental -- resumes from the latest synced record in `table`,
+    stepped back OVERLAP_DAYS to catch late score revisions. Falls back to
+    full history if `table` is empty (first run).
     """
     if days is not None:
         return (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-    return None
+
+    latest = get_latest_updated_at(table) if table else None
+    if not latest:
+        return None
+
+    latest_dt = datetime.fromisoformat(latest.replace("Z", "+00:00"))
+    start_dt = latest_dt - timedelta(days=OVERLAP_DAYS)
+    return start_dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+
+def describe_start(start, days):
+    if start is None:
+        return "  Full history (first run)"
+    if days is not None:
+        return f"  From {start[:10]} (--days {days})"
+    return f"  From {start[:10]} ({OVERLAP_DAYS}-day overlap to catch score revisions)"
 
 
 def fetch_all_pages(endpoint, params=None):
@@ -49,8 +71,8 @@ def fetch_all_pages(endpoint, params=None):
 
 def sync_recovery(days=None):
     print("Syncing recovery data...")
-    start = get_sync_start(days)
-    print(f"  From {start[:10]}" if start else "  Full history")
+    start = get_sync_start(days, table="recovery")
+    print(describe_start(start, days))
     params = {"start": start} if start else {}
     records = fetch_all_pages("/recovery", params)
     conn = get_connection()
@@ -81,8 +103,8 @@ def sync_recovery(days=None):
 
 def sync_sleep(days=None):
     print("Syncing sleep data...")
-    start = get_sync_start(days)
-    print(f"  From {start[:10]}" if start else "  Full history")
+    start = get_sync_start(days, table="sleep")
+    print(describe_start(start, days))
     params = {"start": start} if start else {}
     records = fetch_all_pages("/activity/sleep", params)
     conn = get_connection()
@@ -117,8 +139,8 @@ def sync_sleep(days=None):
 
 def sync_workouts(days=None):
     print("Syncing workout data...")
-    start = get_sync_start(days)
-    print(f"  From {start[:10]}" if start else "  Full history")
+    start = get_sync_start(days, table="workouts")
+    print(describe_start(start, days))
     params = {"start": start} if start else {}
     records = fetch_all_pages("/activity/workout", params)
     conn = get_connection()
@@ -154,8 +176,8 @@ def sync_workouts(days=None):
 
 def sync_cycles(days=None):
     print("Syncing cycle data...")
-    start = get_sync_start(days)
-    print(f"  From {start[:10]}" if start else "  Full history")
+    start = get_sync_start(days, table="cycles")
+    print(describe_start(start, days))
     params = {"start": start} if start else {}
     records = fetch_all_pages("/cycle", params)
     conn = get_connection()

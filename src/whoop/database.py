@@ -8,6 +8,13 @@ def get_connection():
     return sqlite3.connect(DB_PATH)
 
 
+def get_latest_updated_at(table):
+    conn = get_connection()
+    row = conn.execute(f"SELECT MAX(updated_at) FROM {table}").fetchone()
+    conn.close()
+    return row[0]
+
+
 def initialize_db():
     conn = get_connection()
     cursor = conn.cursor()
