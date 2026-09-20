@@ -10,7 +10,7 @@ Usage:
 
 Data sources:
   data/whoop.db      recovery, HRV, RHR
-  data/intervals.db  cardio activities (runs, rides, MTB)
+  data/strava.db     cardio activities (runs, rides, MTB)
   data/manual.db     strength sessions (sync with src/manual/sync.py)
   data/plans/*.md    block plan and pillar targets
 """
@@ -26,7 +26,7 @@ from pathlib import Path
 
 ROOT         = Path(__file__).resolve().parent
 WHOOP_DB     = ROOT / "data" / "whoop.db"
-INTERVALS_DB = ROOT / "data" / "intervals.db"
+STRAVA_DB    = ROOT / "data" / "strava.db"
 MANUAL_DB    = ROOT / "data" / "manual.db"
 PLANS_DIR    = ROOT / "data" / "plans"
 
@@ -147,7 +147,7 @@ def recovery_section(start: date, end: date) -> None:
 # ── cardio activities ─────────────────────────────────────────────────────────
 
 def activities_section(start: date, end: date) -> None:
-    conn = sqlite3.connect(str(INTERVALS_DB))
+    conn = sqlite3.connect(str(STRAVA_DB))
     conn.row_factory = sqlite3.Row
     rows = conn.execute("""
         SELECT
@@ -165,7 +165,7 @@ def activities_section(start: date, end: date) -> None:
 
     hdr(f"CARDIO  {fmt(start)} – {fmt(end)}")
     if not rows:
-        print("  None recorded in Intervals.")
+        print("  None recorded in Strava.")
         return
 
     print(f"  {'Date':<8} {'Day':<4} {'Type':<10} {'Min':>4}  {'Miles':>5}  {'Avg HR':>6}")
@@ -307,7 +307,7 @@ def pillar_section(start: date, end: date, plan_path: Path | None) -> None:
     """, (start.isoformat(), end.isoformat()))}
     conn.close()
 
-    conn = sqlite3.connect(str(INTERVALS_DB))
+    conn = sqlite3.connect(str(STRAVA_DB))
     cardio_count = conn.execute("""
         SELECT COUNT(*) FROM activities
         WHERE date(start_date_local) BETWEEN ? AND ?

@@ -1,7 +1,7 @@
 import sqlite3
 from pathlib import Path
 
-DB_PATH = Path(__file__).resolve().parents[2] / "data" / "intervals.db"
+DB_PATH = Path(__file__).resolve().parents[2] / "data" / "strava.db"
 
 
 def get_connection():
@@ -11,6 +11,12 @@ def get_connection():
 def initialize_db():
     conn = get_connection()
     cursor = conn.cursor()
+    # Same shape as the old Intervals.icu `activities` table, so downstream
+    # consumers (mcp/server.py, review.py) only need a DB-path rename, not a
+    # schema rewrite. `type` is populated from Strava's `sport_type` field
+    # (not the legacy `type` field) -- sport_type is the more granular
+    # vocabulary (MountainBikeRide/GravelRide/VirtualRide etc.) that the
+    # pillar-classification dicts already expect.
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS activities (
             id TEXT PRIMARY KEY,
@@ -33,7 +39,12 @@ def initialize_db():
     """)
     conn.commit()
     conn.close()
-    print("Intervals.icu database initialized.")
+    print("Strava database initialized.")
+
+
+def get_latest_start_date(conn):
+    row = conn.execute("SELECT MAX(start_date_local) FROM activities").fetchone()
+    return row[0] if row else None
 
 
 if __name__ == "__main__":

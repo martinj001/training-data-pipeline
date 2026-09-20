@@ -16,6 +16,7 @@ data/manual/strength/*
 # Environment variables and tokens - never commit
 .env
 .tokens
+.strava_tokens
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

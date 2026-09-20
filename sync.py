@@ -4,12 +4,12 @@ CLI dispatcher for training-data-pipeline.
 Usage:
   python sync.py whoop                  — incremental sync (auto-detects last record)
   python sync.py whoop --days 30        — sync last 30 days regardless of DB state
-  python sync.py intervals              — sync Intervals.icu (Zwift + Garmin activities)
-  python sync.py intervals --days 60    — sync last 60 days
+  python sync.py strava                 — sync Strava (Garmin + Wahoo + Zwift activities)
+  python sync.py strava --days 60       — sync last 60 days
   python sync.py trainingpeaks          — ingest all TrainingPeaks zip files
   python sync.py manual                 — ingest manual Excel logs (last 30 days)
   python sync.py manual --days 0        — ingest all manual logs
-  python sync.py all                    — run whoop + intervals + manual (incremental)
+  python sync.py all                    — run whoop + strava + manual (incremental)
   python sync.py all --days 14          — run all sources for last 14 days
 """
 import os
@@ -22,12 +22,12 @@ ROOT = Path(__file__).resolve().parent
 
 SOURCES = {
     "whoop": ROOT / "src" / "whoop" / "sync.py",
-    "intervals": ROOT / "src" / "intervals" / "sync.py",
+    "strava": ROOT / "src" / "strava" / "sync.py",
     "trainingpeaks": ROOT / "src" / "trainingpeaks" / "ingestor.py",
     "manual": ROOT / "src" / "manual" / "sync.py",
 }
 
-ALL_SOURCES = ["whoop", "intervals", "manual"]
+ALL_SOURCES = ["whoop", "strava", "manual"]
 
 # Always use THIS repo's own venv, regardless of whatever python happens to be
 # active in the calling shell -- a different repo's venv being active (e.g.

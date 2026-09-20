@@ -7,7 +7,7 @@ from mcp.server.fastmcp import FastMCP
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 WHOOP_DB = PROJECT_ROOT / "data" / "whoop.db"
-INTERVALS_DB = PROJECT_ROOT / "data" / "intervals.db"
+STRAVA_DB = PROJECT_ROOT / "data" / "strava.db"
 TP_DB = PROJECT_ROOT / "data" / "trainingpeaks.db"
 MANUAL_DB = PROJECT_ROOT / "data" / "manual.db"
 STRENGTH_DIR = PROJECT_ROOT / "data" / "manual" / "strength"
@@ -19,8 +19,8 @@ def _utc_to_local_date(ts: str) -> str:
     """Convert a UTC ISO timestamp (Z suffix) to local date string YYYY-MM-DD."""
     return datetime.fromisoformat(ts.replace("Z", "+00:00")).astimezone().strftime("%Y-%m-%d")
 
-# Intervals.icu activity types → pillar
-INTERVALS_PILLAR = {
+# Strava sport_type → pillar
+STRAVA_PILLAR = {
     "Ride": "cardio",
     "VirtualRide": "cardio",
     "MountainBikeRide": "cardio",
@@ -39,7 +39,7 @@ INTERVALS_PILLAR = {
 }
 
 
-# Whoop cycling sport_ids — skip these, Intervals.icu (Zwift/Garmin) covers them
+# Whoop cycling sport_ids — skip these, Strava (Garmin/Wahoo/Zwift) covers them
 WHOOP_CYCLING_IDS = {1, 57}
 
 # Whoop running sport_ids — show as cardio
@@ -47,8 +47,8 @@ WHOOP_RUNNING_IDS = {0}
 
 
 def classify_pillar(activity_type: str) -> str:
-    if activity_type in INTERVALS_PILLAR:
-        return INTERVALS_PILLAR[activity_type]
+    if activity_type in STRAVA_PILLAR:
+        return STRAVA_PILLAR[activity_type]
     s = activity_type.lower()
     if any(k in s for k in ("strength", "weight", "functional", "crossfit", "gym")):
         return "strength"
@@ -73,16 +73,16 @@ def _count_recent_strength_sessions(days: int) -> int:
 def get_recent_workouts(days: int = 7) -> str:
     """
     Get workouts over the last N days.
-    Cardio: Intervals.icu primary (Zwift + Garmin), TrainingPeaks fallback.
+    Cardio: Strava primary (Garmin + Wahoo + Zwift), TrainingPeaks fallback.
     Strength/mobility: Whoop workout log (log workouts in the Whoop app before the gym).
     Shows date, source, pillar, duration, distance/strain, and HR.
     """
     since = (datetime.now() - timedelta(days=days)).date().isoformat()
     rows_out = []
 
-    # Primary: Intervals.icu (Zwift + Garmin)
-    if INTERVALS_DB.exists():
-        conn = sqlite3.connect(str(INTERVALS_DB))
+    # Primary: Strava (Garmin + Wahoo + Zwift)
+    if STRAVA_DB.exists():
+        conn = sqlite3.connect(str(STRAVA_DB))
         conn.row_factory = sqlite3.Row
         rows = conn.execute("""
             SELECT start_date_local, name, type, moving_time_sec,
@@ -94,12 +94,11 @@ def get_recent_workouts(days: int = 7) -> str:
         conn.close()
         for r in rows:
             atype = r["type"] or "Unknown"
-            if atype == "VirtualRide":
-                source = "Zwift"
-            elif atype in ("Ride", "MountainBikeRide", "GravelRide", "Run", "TrailRun", "Hike", "Walk"):
-                source = "Garmin"
-            else:
-                source = atype
+            # Both Garmin and Wahoo feed Strava directly now, and the activity
+            # list endpoint doesn't tell us which device recorded it -- "Zwift"
+            # is still a reliable signal for virtual rides, everything else is
+            # just labeled generically rather than guessing a specific device.
+            source = "Zwift" if atype == "VirtualRide" else "Strava"
             mins = round((r["moving_time_sec"] or 0) / 60)
             dist = f"{r['distance_m']/1000:.1f}km" if r["distance_m"] else ""
             hr = f"avg HR {r['average_heartrate']:.0f}" if r["average_heartrate"] else ""
@@ -110,8 +109,8 @@ def get_recent_workouts(days: int = 7) -> str:
                     line += f" | {extra}"
             rows_out.append((r["start_date_local"][:10], line))
 
-    # Fallback: TrainingPeaks for any dates not covered by Intervals.icu
-    intervals_dates = {r[0] for r in rows_out}
+    # Fallback: TrainingPeaks for any dates not covered by Strava
+    strava_dates = {r[0] for r in rows_out}
     conn = sqlite3.connect(str(TP_DB))
     conn.row_factory = sqlite3.Row
     tp_rows = conn.execute("""
@@ -121,7 +120,7 @@ def get_recent_workouts(days: int = 7) -> str:
     conn.close()
     for r in tp_rows:
         date = str(r["start_time"])[:10]
-        if date in intervals_dates:
+        if date in strava_dates:
             continue  # already covered
         sport = (r["sport"] or "cycling").title()
         mins = round((r["total_elapsed_time_sec"] or 0) / 60)
@@ -134,7 +133,7 @@ def get_recent_workouts(days: int = 7) -> str:
         rows_out.append((date, line))
 
     # Whoop: strength and mobility sessions (gym, yoga, etc.)
-    # Skip cardio sport_ids — those are already covered by Intervals.icu
+    # Skip cardio sport_ids — those are already covered by Strava
     whoop_since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
     if WHOOP_DB.exists():
         conn = sqlite3.connect(str(WHOOP_DB))
@@ -149,7 +148,7 @@ def get_recent_workouts(days: int = 7) -> str:
         for r in whoop_rows:
             sid = r["sport_id"]
             if sid in WHOOP_CYCLING_IDS:
-                continue  # covered by Intervals.icu
+                continue  # covered by Strava
             if sid in WHOOP_RUNNING_IDS:
                 name, pillar = "Run", "cardio"
             else:
@@ -224,7 +223,7 @@ def get_recovery(days: int = 7) -> str:
 def get_weekly_pillar_summary() -> str:
     """
     Summarise the last 7 days of training by pillar: strength, cardio, mobility.
-    Cardio comes from Intervals.icu (Zwift, Garmin) with TrainingPeaks fallback for dates not yet in Intervals.
+    Cardio comes from Strava (Garmin, Wahoo, Zwift) with TrainingPeaks fallback for dates not yet in Strava.
     Strength comes from manual Excel logs.
     Mobility is currently tracked via manual logs only.
     Flags any pillar that has been missed this week.
@@ -232,10 +231,10 @@ def get_weekly_pillar_summary() -> str:
     since = (datetime.now() - timedelta(days=7)).date().isoformat()
 
     pillars: dict[str, list[str]] = {"strength": [], "cardio": [], "mobility": []}
-    intervals_dates: set[str] = set()
+    strava_dates: set[str] = set()
 
-    if INTERVALS_DB.exists():
-        conn = sqlite3.connect(str(INTERVALS_DB))
+    if STRAVA_DB.exists():
+        conn = sqlite3.connect(str(STRAVA_DB))
         conn.row_factory = sqlite3.Row
         rows = conn.execute("""
             SELECT start_date_local, name, type FROM activities
@@ -246,9 +245,9 @@ def get_weekly_pillar_summary() -> str:
             atype = r["type"] or "Unknown"
             label = r["name"] or atype
             pillars[classify_pillar(atype)].append(label)
-            intervals_dates.add(r["start_date_local"][:10])
+            strava_dates.add(r["start_date_local"][:10])
 
-    # TrainingPeaks fallback for dates not yet in Intervals.icu
+    # TrainingPeaks fallback for dates not yet in Strava
     if TP_DB.exists():
         conn = sqlite3.connect(str(TP_DB))
         conn.row_factory = sqlite3.Row
@@ -259,7 +258,7 @@ def get_weekly_pillar_summary() -> str:
         conn.close()
         for r in tp_rows:
             date = str(r["start_time"])[:10]
-            if date in intervals_dates:
+            if date in strava_dates:
                 continue
             sport = (r["sport"] or "cycling").title()
             pillars[classify_pillar(sport)].append(f"{sport} (TP)")
@@ -363,14 +362,14 @@ def get_strength_sessions(days: int = 14) -> str:
 @mcp.tool()
 def get_training_load_trend(weeks: int = 6) -> str:
     """
-    Show a week-by-week breakdown of training over the last N weeks using Intervals.icu data.
+    Show a week-by-week breakdown of training over the last N weeks using Strava data.
     Reports session counts by pillar and total duration per week.
     Useful for spotting patterns — too many heavy weeks, missing pillars, etc.
     """
-    if not INTERVALS_DB.exists():
-        return "Intervals.icu database not found. Run src/intervals/sync.py first."
+    if not STRAVA_DB.exists():
+        return "Strava database not found. Run src/strava/sync.py first."
 
-    conn = sqlite3.connect(str(INTERVALS_DB))
+    conn = sqlite3.connect(str(STRAVA_DB))
     conn.row_factory = sqlite3.Row
     lines = [f"Training load trend — last {weeks} weeks:\n"]
 
@@ -477,9 +476,9 @@ _SYNC_SCRIPT = PROJECT_ROOT / "sync.py"
 @mcp.tool()
 def sync_data(source: str = "all", days: int = None) -> str:
     """
-    Pull the latest training data from all sources (Whoop, Intervals.icu, manual Excel logs).
+    Pull the latest training data from all sources (Whoop, Strava, manual Excel logs).
     Call this before any planning session to ensure Claude has up-to-date data.
-    source: 'all', 'whoop', 'intervals', or 'manual' (default: 'all')
+    source: 'all', 'whoop', 'strava', or 'manual' (default: 'all')
     days: how far back to re-sync; omit to pick up from last record
     """
     python = str(_VENV_PYTHON) if _VENV_PYTHON.exists() else sys.executable
