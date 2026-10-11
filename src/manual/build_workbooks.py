@@ -239,13 +239,14 @@ def main() -> None:
     STRENGTH_DIR.mkdir(parents=True, exist_ok=True)
 
     plan_text = plan_path.read_text(encoding="utf-8")
+    strength_days = parse_strength_days(plan_path)
+    if not strength_days:
+        print("No strength sessions in plan — no workbooks to build.")
+        return
+
     blocks    = parse_workbook_blocks(plan_text)
     if not blocks:
         raise SystemExit("No ```workbook:A``` / ```workbook:B``` blocks found in plan.")
-
-    strength_days = parse_strength_days(plan_path)
-    if not strength_days:
-        raise SystemExit("No strength sessions found in plan — check table format.")
 
     plan_start = date.fromisoformat(plan_path.stem)
 
