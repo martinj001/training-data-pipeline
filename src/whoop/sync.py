@@ -113,22 +113,25 @@ def sync_sleep(days=None):
 
     for r in records:
         score = r.get("score") or {}
+        stage = score.get("stage_summary") or {}
         cursor.execute("""
             INSERT OR REPLACE INTO sleep (
                 sleep_id, cycle_id, created_at, updated_at, start, end,
                 score_state, total_in_bed_time_milli, total_awake_time_milli,
                 total_light_sleep_time_milli, total_slow_wave_sleep_time_milli,
                 total_rem_sleep_time_milli, sleep_performance_percentage,
-                sleep_consistency_percentage, sleep_efficiency_percentage
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                sleep_consistency_percentage, sleep_efficiency_percentage,
+                disturbance_count
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             r.get("id"), r.get("cycle_id"), r.get("created_at"),
             r.get("updated_at"), r.get("start"), r.get("end"),
             r.get("score_state"),
-            score.get("total_in_bed_time_milli"), score.get("total_awake_time_milli"),
-            score.get("total_light_sleep_time_milli"), score.get("total_slow_wave_sleep_time_milli"),
-            score.get("total_rem_sleep_time_milli"), score.get("sleep_performance_percentage"),
+            stage.get("total_in_bed_time_milli"), stage.get("total_awake_time_milli"),
+            stage.get("total_light_sleep_time_milli"), stage.get("total_slow_wave_sleep_time_milli"),
+            stage.get("total_rem_sleep_time_milli"), score.get("sleep_performance_percentage"),
             score.get("sleep_consistency_percentage"), score.get("sleep_efficiency_percentage"),
+            stage.get("disturbance_count"),
         ))
         inserted += cursor.rowcount
 

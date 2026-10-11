@@ -50,9 +50,14 @@ def initialize_db():
             total_rem_sleep_time_milli INTEGER,
             sleep_performance_percentage REAL,
             sleep_consistency_percentage REAL,
-            sleep_efficiency_percentage REAL
+            sleep_efficiency_percentage REAL,
+            disturbance_count INTEGER
         )
     """)
+
+    existing_cols = {row[1] for row in cursor.execute("PRAGMA table_info(sleep)")}
+    if "disturbance_count" not in existing_cols:
+        cursor.execute("ALTER TABLE sleep ADD COLUMN disturbance_count INTEGER")
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS workouts (
