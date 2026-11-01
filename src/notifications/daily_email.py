@@ -147,6 +147,13 @@ def _extract_from_table(plan_text: str) -> str | None:
                 if detail:
                     lines += ["", "---", "", detail]
 
+            # For run days, append the pre/post-run routine so it's not just the
+            # table row -- the actual warm-up/stretch steps belong in the email too.
+            elif "run" in session.lower():
+                detail = _find_session_detail(plan_text, "Running Support Routine")
+                if detail:
+                    lines += ["", "---", "", detail]
+
             return "\n".join(lines)
 
     return None
